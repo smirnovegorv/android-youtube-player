@@ -47,7 +47,12 @@
     	  width: '100%',
     			
         events: {
-    	    onReady: function(event) { YouTubePlayerBridge.sendReady() },
+    	    onReady: function(event) {
+    	      YouTubePlayerBridge.sendReady();
+    	      hideVideoTitle();
+    	      hideTabletPopup();
+    	      hideCaption();
+            },
     		  onStateChange: function(event) { sendPlayerStateChange(event.data) },
     		  onPlaybackQualityChange: function(event) { YouTubePlayerBridge.sendPlaybackQualityChange(event.data) },
     		  onPlaybackRateChange: function(event) { YouTubePlayerBridge.sendPlaybackRateChange(event.data) },
@@ -58,6 +63,58 @@
     	  playerVars: <<injectedPlayerVars>>
 
       });
+    }
+
+    function hideVideoTitle() {
+      setInterval(() => {
+        const playerIFrame = document.querySelector("iframe");
+        if (!playerIFrame) {
+          return;
+        }
+
+        const frameDoc = playerIFrame.contentDocument;
+        if (!frameDoc) {
+          return;
+        }
+
+        const title = frameDoc.querySelector('.ytp-chrome-top');
+        if (title) {
+          title.style.display = 'none';
+        }
+      }, 100);
+    }
+
+
+    function hideTabletPopup() {
+      setInterval(() => {
+        const playerIFrame = document.querySelector("iframe");
+        if (!playerIFrame) {
+          return;
+        }
+
+        const frameDoc = playerIFrame.contentDocument;
+        if (!frameDoc) {
+          return;
+        }
+
+        const collection = frameDoc.getElementsByClassName("ytp-pause-overlay-container")[0];
+        if (collection) {
+          collection.style.display = 'none';
+        }
+        const watchOnYoutube = frameDoc.getElementsByClassName("ytp-youtube-button")[0];
+        if (watchOnYoutube) {
+          watchOnYoutube.style.display = 'none';
+        }
+      }, 100);
+    }
+
+    function hideCaption() {
+      setInterval(() => {
+        if(!player) {
+          return;
+        }
+        player.unloadModule('captions');
+      }, 1000);
     }
 
     function sendPlayerStateChange(playerState) {
