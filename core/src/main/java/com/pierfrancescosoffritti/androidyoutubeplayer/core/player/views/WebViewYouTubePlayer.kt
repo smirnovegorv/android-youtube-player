@@ -10,11 +10,14 @@ import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
+import androidx.annotation.GuardedBy
 import androidx.annotation.VisibleForTesting
 import com.pierfrancescosoffritti.androidyoutubeplayer.R
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.BooleanProvider
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayerBridge
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayerCallbacks
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.FullscreenListener
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.YouTubePlayerListener
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions
@@ -22,31 +25,46 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.toFloat
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
-import java.util.*
 
 
-private class YouTubePlayerImpl(private val webView: WebView) : YouTubePlayer {
+private class YouTubePlayerImpl(
+  private val webView: WebView,
+  private val callbacks: YouTubePlayerCallbacks
+) : YouTubePlayer {
   private val mainThread: Handler = Handler(Looper.getMainLooper())
-  val listeners = mutableSetOf<YouTubePlayerListener>()
+
+  private val lock = Any()
+  @GuardedBy("lock")
+  private val listeners = mutableSetOf<YouTubePlayerListener>()
 
   override fun loadVideo(videoId: String, startSeconds: Float) = webView.invoke("loadVideo", videoId, startSeconds)
   override fun cueVideo(videoId: String, startSeconds: Float) = webView.invoke("cueVideo", videoId, startSeconds)
   override fun play() = webView.invoke("playVideo")
   override fun pause() = webView.invoke("pauseVideo")
+  override fun nextVideo() = webView.invoke("nextVideo")
+  override fun previousVideo() = webView.invoke("previousVideo")
+  override fun playVideoAt(index: Int) = webView.invoke("playVideoAt", index)
+  override fun setLoop(loop: Boolean) = webView.invoke("setLoop", loop)
+  override fun setShuffle(shuffle: Boolean) = webView.invoke("setShuffle", shuffle)
   override fun mute() = webView.invoke("mute")
   override fun unMute() = webView.invoke("unMute")
+  override fun isMutedAsync(callback: BooleanProvider) {
+    val requestId = callbacks.registerBooleanCallback(callback)
+    webView.invoke("getMuteValue", requestId)
+  }
   override fun setVolume(volumePercent: Int) {
     require(volumePercent in 0..100) { "Volume must be between 0 and 100" }
     webView.invoke("setVolume", volumePercent)
   }
   override fun seekTo(time: Float) = webView.invoke("seekTo", time)
   override fun setPlaybackRate(playbackRate: PlayerConstants.PlaybackRate) = webView.invoke("setPlaybackRate", playbackRate.toFloat())
-  override fun toggleFullscreen() = webView.invoke("toggleFullscreen")
-  override fun addListener(listener: YouTubePlayerListener) = listeners.add(listener)
-  override fun removeListener(listener: YouTubePlayerListener) = listeners.remove(listener)
+  override fun addListener(listener: YouTubePlayerListener) = synchronized(lock) { listeners.add(listener) }
+  override fun removeListener(listener: YouTubePlayerListener) = synchronized(lock) { listeners.remove(listener) }
+
+  fun getListeners(): Collection<YouTubePlayerListener> = synchronized(lock) { listeners.toList() }
 
   fun release() {
-    listeners.clear()
+    synchronized(lock) { listeners.clear() }
     mainThread.removeCallbacksAndMessages(null)
   }
 
@@ -81,24 +99,26 @@ internal class WebViewYouTubePlayer constructor(
   /** Constructor used by tools */
   constructor(context: Context) : this(context, FakeWebViewYouTubeListener)
 
-  private val _youTubePlayer = YouTubePlayerImpl(this)
+  private val youTubePlayerCallbacks = YouTubePlayerCallbacks()
+  private val _youTubePlayer = YouTubePlayerImpl(this, youTubePlayerCallbacks)
   internal val youtubePlayer: YouTubePlayer get() = _youTubePlayer
 
   private lateinit var youTubePlayerInitListener: (YouTubePlayer) -> Unit
 
   internal var isBackgroundPlaybackEnabled = false
 
-  internal fun initialize(initListener: (YouTubePlayer) -> Unit, playerOptions: IFramePlayerOptions?) {
+  private val youTubePlayerBridge = YouTubePlayerBridge(this)
+
+  internal fun initialize(initListener: (YouTubePlayer) -> Unit, playerOptions: IFramePlayerOptions?, videoId: String?) {
     youTubePlayerInitListener = initListener
-    initWebView(playerOptions ?: IFramePlayerOptions.default)
+    initWebView(playerOptions ?: IFramePlayerOptions.getDefault(context), videoId)
   }
 
-  // create new set to avoid concurrent modifications
-  override val listeners: Collection<YouTubePlayerListener> get() = _youTubePlayer.listeners.toSet()
+  override val listeners: Collection<YouTubePlayerListener> get() = _youTubePlayer.getListeners()
   override fun getInstance(): YouTubePlayer = _youTubePlayer
   override fun onYouTubeIFrameAPIReady() = youTubePlayerInitListener(_youTubePlayer)
-  fun addListener(listener: YouTubePlayerListener) = _youTubePlayer.listeners.add(listener)
-  fun removeListener(listener: YouTubePlayerListener) = _youTubePlayer.listeners.remove(listener)
+  fun addListener(listener: YouTubePlayerListener) = _youTubePlayer.addListener(listener)
+  fun removeListener(listener: YouTubePlayerListener) = _youTubePlayer.removeListener(listener)
 
   override fun destroy() {
     _youTubePlayer.release()
@@ -106,16 +126,18 @@ internal class WebViewYouTubePlayer constructor(
   }
 
   @SuppressLint("SetJavaScriptEnabled")
-  private fun initWebView(playerOptions: IFramePlayerOptions) {
+  private fun initWebView(playerOptions: IFramePlayerOptions, videoId: String?) {
     settings.apply {
       javaScriptEnabled = true
       mediaPlaybackRequiresUserGesture = false
       cacheMode = WebSettings.LOAD_DEFAULT
     }
 
-    addJavascriptInterface(YouTubePlayerBridge(this), "YouTubePlayerBridge")
+    addJavascriptInterface(youTubePlayerBridge, "YouTubePlayerBridge")
+    addJavascriptInterface(youTubePlayerCallbacks, "YouTubePlayerCallbacks")
 
     val htmlPage = readHTMLFromUTF8File(resources.openRawResource(R.raw.ayp_youtube_player))
+      .replace("<<injectedVideoId>>", if (videoId != null) { "'$videoId'" } else { "undefined" })
       .replace("<<injectedPlayerVars>>", playerOptions.toString())
 
     loadDataWithBaseURL(playerOptions.getOrigin(), htmlPage, "text/html", "utf-8", null)

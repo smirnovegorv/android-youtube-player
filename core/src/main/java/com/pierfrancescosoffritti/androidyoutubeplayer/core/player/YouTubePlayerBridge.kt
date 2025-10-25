@@ -33,8 +33,11 @@ class YouTubePlayerBridge(private val youTubePlayerOwner: YouTubePlayerBridgeCal
 
     private const val RATE_0_25 = "0.25"
     private const val RATE_0_5 = "0.5"
+    private const val RATE_0_75 = "0.75"
     private const val RATE_1 = "1"
+    private const val RATE_1_25 = "1.25"
     private const val RATE_1_5 = "1.5"
+    private const val RATE_1_75 = "1.75"
     private const val RATE_2 = "2"
 
     private const val ERROR_INVALID_PARAMETER_IN_REQUEST = "2"
@@ -42,6 +45,7 @@ class YouTubePlayerBridge(private val youTubePlayerOwner: YouTubePlayerBridgeCal
     private const val ERROR_VIDEO_NOT_FOUND = "100"
     private const val ERROR_VIDEO_NOT_PLAYABLE_IN_EMBEDDED_PLAYER1 = "101"
     private const val ERROR_VIDEO_NOT_PLAYABLE_IN_EMBEDDED_PLAYER2 = "150"
+    private const val ERROR_REQUEST_MISSING_HTTP_REFERER = "153"
   }
 
   private val mainThreadHandler: Handler = Handler(Looper.getMainLooper())
@@ -182,8 +186,11 @@ class YouTubePlayerBridge(private val youTubePlayerOwner: YouTubePlayerBridgeCal
     return when {
       rate.equals(RATE_0_25, ignoreCase = true) -> PlayerConstants.PlaybackRate.RATE_0_25
       rate.equals(RATE_0_5, ignoreCase = true) -> PlayerConstants.PlaybackRate.RATE_0_5
+      rate.equals(RATE_0_75, ignoreCase = true) -> PlayerConstants.PlaybackRate.RATE_0_75
       rate.equals(RATE_1, ignoreCase = true) -> PlayerConstants.PlaybackRate.RATE_1
+      rate.equals(RATE_1_25, ignoreCase = true) -> PlayerConstants.PlaybackRate.RATE_1_25
       rate.equals(RATE_1_5, ignoreCase = true) -> PlayerConstants.PlaybackRate.RATE_1_5
+      rate.equals(RATE_1_75, ignoreCase = true) -> PlayerConstants.PlaybackRate.RATE_1_75
       rate.equals(RATE_2, ignoreCase = true) -> PlayerConstants.PlaybackRate.RATE_2
       else -> PlayerConstants.PlaybackRate.UNKNOWN
     }
@@ -196,6 +203,7 @@ class YouTubePlayerBridge(private val youTubePlayerOwner: YouTubePlayerBridgeCal
       error.equals(ERROR_VIDEO_NOT_FOUND, ignoreCase = true) -> PlayerConstants.PlayerError.VIDEO_NOT_FOUND
       error.equals(ERROR_VIDEO_NOT_PLAYABLE_IN_EMBEDDED_PLAYER1, ignoreCase = true) -> PlayerConstants.PlayerError.VIDEO_NOT_PLAYABLE_IN_EMBEDDED_PLAYER
       error.equals(ERROR_VIDEO_NOT_PLAYABLE_IN_EMBEDDED_PLAYER2, ignoreCase = true) -> PlayerConstants.PlayerError.VIDEO_NOT_PLAYABLE_IN_EMBEDDED_PLAYER
+      error.equals(ERROR_REQUEST_MISSING_HTTP_REFERER, ignoreCase = true) -> PlayerConstants.PlayerError.REQUEST_MISSING_HTTP_REFERER
       else -> PlayerConstants.PlayerError.UNKNOWN
     }
   }

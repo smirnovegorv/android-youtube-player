@@ -1,16 +1,16 @@
 package com.pierfrancescosoffritti.androidyoutubeplayer.core.sampleapp.examples.completeExample
 
 import android.content.pm.ActivityInfo
-import android.content.res.Configuration
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants.PlaybackRate
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.isMuted
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.FullscreenListener
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions
@@ -18,6 +18,9 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.utils.loadOrC
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.sampleapp.utils.VideoIdsProvider
 import com.pierfrancescosoffritti.aytplayersample.R
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 class CompleteExampleActivity : AppCompatActivity() {
   private lateinit var youTubePlayerView: YouTubePlayerView
@@ -30,6 +33,9 @@ class CompleteExampleActivity : AppCompatActivity() {
   private lateinit var playNextVideoButton: Button
   private lateinit var playbackSpeedTextView: TextView
 
+  private lateinit var muteButton: Button
+  private lateinit var muteTextView: TextView
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_complete_example)
@@ -39,31 +45,10 @@ class CompleteExampleActivity : AppCompatActivity() {
     playerUiContainer = findViewById(R.id.player_ui_container)
     playNextVideoButton = findViewById(R.id.next_video_button)
     playbackSpeedTextView = findViewById(R.id.playback_speed_text_view)
+    muteButton = findViewById(R.id.mute_button)
+    muteTextView = findViewById(R.id.mute_text_view)
 
     initYouTubePlayerView(youTubePlayerView)
-  }
-
-  override fun onConfigurationChanged(configuration: Configuration) {
-    super.onConfigurationChanged(configuration)
-
-    // Checks the orientation of the screen
-    if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-      if (!isFullscreen) {
-        youTubePlayer?.toggleFullscreen()
-      }
-    } else if (configuration.orientation == Configuration.ORIENTATION_PORTRAIT) {
-      if (isFullscreen) {
-        youTubePlayer?.toggleFullscreen()
-      }
-    }
-  }
-
-  override fun onBackPressed() {
-    if (isFullscreen) {
-      youTubePlayer?.toggleFullscreen()
-    } else {
-      super.onBackPressed()
-    }
   }
 
   private fun initYouTubePlayerView(youTubePlayerView: YouTubePlayerView) {
@@ -107,6 +92,7 @@ class CompleteExampleActivity : AppCompatActivity() {
         youTubePlayer.loadOrCueVideo(lifecycle, VideoIdsProvider.getNextVideoId(), 0f)
         setPlayNextVideoButtonClickListener(youTubePlayer)
         setPlaybackSpeedButtonsClickListeners(youTubePlayer)
+        setMuteButtonClickListener(youTubePlayer)
       }
 
       override fun onPlaybackRateChange(youTubePlayer: YouTubePlayer, playbackRate: PlaybackRate) {
@@ -114,7 +100,7 @@ class CompleteExampleActivity : AppCompatActivity() {
       }
     }
 
-    val iFramePlayerOptions = IFramePlayerOptions.Builder()
+    val iFramePlayerOptions = IFramePlayerOptions.Builder(applicationContext)
       .controls(1)
       .fullscreen(1) // enable full screen button
       .build()
@@ -142,5 +128,33 @@ class CompleteExampleActivity : AppCompatActivity() {
     playbackSpeed_0_25.setOnClickListener { youTubePlayer.setPlaybackRate(PlaybackRate.RATE_0_25) }
     playbackSpeed_1.setOnClickListener { youTubePlayer.setPlaybackRate(PlaybackRate.RATE_1) }
     playbackSpeed_2.setOnClickListener { youTubePlayer.setPlaybackRate(PlaybackRate.RATE_2) }
+  }
+
+  /**
+   * Set the click listener for the "mute" button and launches a coroutine to update the mute status
+   */
+  private fun setMuteButtonClickListener(youTubePlayer: YouTubePlayer) {
+    lifecycleScope.launch {
+      while (isActive) {
+        val isMute = youTubePlayer.isMuted()
+        if (isMute) {
+          muteTextView.text = "Muted"
+        } else {
+          muteTextView.text = "Unmuted"
+        }
+        delay(100)
+      }
+    }
+
+    muteButton.setOnClickListener {
+      lifecycleScope.launch {
+        val isMute = youTubePlayer.isMuted()
+        if (isMute) {
+          youTubePlayer.unMute()
+        } else {
+          youTubePlayer.mute()
+        }
+      }
+    }
   }
 }

@@ -7,6 +7,7 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.chromecast.chromecastsend
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayerBridge
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.BooleanProvider
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.YouTubePlayerListener
 import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.toFloat
 
@@ -70,6 +71,49 @@ class ChromecastYouTubePlayer internal constructor(private val chromecastCommuni
     chromecastCommunicationChannel.sendMessage(message)
   }
 
+  override fun nextVideo() {
+    val message = JSONUtils.buildFlatJson(
+      "command" to ChromecastCommunicationConstants.PLAY_NEXT_VIDEO
+    )
+
+    chromecastCommunicationChannel.sendMessage(message)
+  }
+
+  override fun previousVideo() {
+    val message = JSONUtils.buildFlatJson(
+      "command" to ChromecastCommunicationConstants.PLAY_PREVIOUS_VIDEO
+    )
+
+    chromecastCommunicationChannel.sendMessage(message)
+  }
+
+  override fun playVideoAt(index: Int) {
+    val message = JSONUtils.buildFlatJson(
+      "command" to ChromecastCommunicationConstants.PLAY_VIDEO_AT,
+      "index" to index.toString()
+    )
+
+    chromecastCommunicationChannel.sendMessage(message)
+  }
+
+  override fun setLoop(loop: Boolean) {
+    val message = JSONUtils.buildFlatJson(
+      "command" to ChromecastCommunicationConstants.SET_LOOP,
+      "loop" to loop.toString()
+    )
+
+    chromecastCommunicationChannel.sendMessage(message)
+  }
+
+  override fun setShuffle(shuffle: Boolean) {
+    val message = JSONUtils.buildFlatJson(
+      "command" to ChromecastCommunicationConstants.SET_SHUFFLE,
+      "shuffle" to shuffle.toString()
+    )
+
+    chromecastCommunicationChannel.sendMessage(message)
+  }
+
   override fun mute() {
     val message = JSONUtils.buildFlatJson(
       "command" to ChromecastCommunicationConstants.MUTE
@@ -84,6 +128,10 @@ class ChromecastYouTubePlayer internal constructor(private val chromecastCommuni
     )
 
     chromecastCommunicationChannel.sendMessage(message)
+  }
+
+  override fun isMutedAsync(callback: BooleanProvider) {
+    throw NotImplementedError("isMutedAsync is not implemented in ChromecastYouTubePlayer")
   }
 
   override fun setVolume(volumePercent: Int) {
@@ -112,8 +160,6 @@ class ChromecastYouTubePlayer internal constructor(private val chromecastCommuni
 
     chromecastCommunicationChannel.sendMessage(message)
   }
-
-  override fun toggleFullscreen() { }
 
   override val listeners: Collection<YouTubePlayerListener> get() =  youTubePlayerListeners
   override fun addListener(listener: YouTubePlayerListener): Boolean = youTubePlayerListeners.add(listener)
